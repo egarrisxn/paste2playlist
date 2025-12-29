@@ -1,7 +1,7 @@
 {
   "name": "paste2playlist",
   "version": "1.0.0",
-  "description": "create playlists from text inputs",
+  "description": "Creating playlists with a simple paste.",
   "homepage": "https://paste2playlist.vercel.app",
   "author": "Ethan G. (https://egxo.dev)",
   "license": "MIT",
