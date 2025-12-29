@@ -86,40 +86,44 @@ export default function CallbackHandler() {
 
   if (status === "loading") {
     return (
+      <div className="mx-auto flex min-h-screen w-full flex-col items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-[#1DB954]/10">
+              <Disc3 className="size-6 text-[#1DB954]" />
+            </div>
+            <CardTitle>Finishing Spotify Login</CardTitle>
+            <CardDescription>
+              Please wait while we complete your authentication...
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Loader2 className="size-8 animate-spin text-[#1DB954]" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex min-h-screen w-full flex-col items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-[#1DB954]/10">
             <Disc3 className="size-6 text-[#1DB954]" />
           </div>
-          <CardTitle>Finishing Spotify Login</CardTitle>
-          <CardDescription>
-            Please wait while we complete your authentication...
-          </CardDescription>
+          <CardTitle>Connection Failed</CardTitle>
+          <CardDescription>{errorMessage}</CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
-          <Loader2 className="size-8 animate-spin text-[#1DB954]" />
+          <div className="flex flex-col items-center gap-4">
+            <XCircle className="size-8 text-destructive" />
+            <Button onClick={() => router.push("/")} variant="outline">
+              Back to Home
+            </Button>
+          </div>
         </CardContent>
       </Card>
-    );
-  }
-
-  return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-[#1DB954]/10">
-          <Disc3 className="size-6 text-[#1DB954]" />
-        </div>
-        <CardTitle>Connection Failed</CardTitle>
-        <CardDescription>{errorMessage}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <XCircle className="size-8 text-destructive" />
-          <Button onClick={() => router.push("/")} variant="outline">
-            Back to Home
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

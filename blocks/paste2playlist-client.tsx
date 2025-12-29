@@ -151,7 +151,7 @@ export default function Paste2PlaylistClient() {
         onDisconnect={handleDisconnect}
       />
 
-      <div className="container mx-auto max-w-3xl space-y-8 px-4 pt-16 pb-8">
+      <div className="container mx-auto max-w-3xl space-y-8 px-4 py-8 sm:py-16">
         {!auth.isConnected && <Hero />}
         <ErrorAlert message={error} />
 
