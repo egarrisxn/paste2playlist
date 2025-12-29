@@ -1,6 +1,6 @@
-import PublicFooter from "@/components/public-footer";
+import Footer from "@/components/footer";
 
-export default function PubliclLayout({
+export default function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -8,7 +8,7 @@ export default function PubliclLayout({
   return (
     <div className="mx-auto grid min-h-dvh w-full grid-rows-[1fr_auto]">
       <main className="grid px-4">{children}</main>
-      <PublicFooter />
+      <Footer />
     </div>
   );
 }

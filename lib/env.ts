@@ -1,7 +1,19 @@
-export const redirectUri =
-  process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI ??
-  "http://127.0.0.1:3000/api/spotify/callback";
+export const redirectUri = (() => {
+  const v = process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
+  if (!v) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SPOTIFY_REDIRECT_URI. Check .env.local or deployment env."
+    );
+  }
+  return v;
+})();
 
-export const clientId =
-  process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ??
-  "d50fb25bcbd34c069613625c76481d5d";
+export const clientId = (() => {
+  const v = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
+  if (!v) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SPOTIFY_CLIENT_ID. Check .env.local or deployment env."
+    );
+  }
+  return v;
+})();

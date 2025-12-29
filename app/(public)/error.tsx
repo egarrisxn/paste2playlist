@@ -9,9 +9,5 @@ export default function Error({ error, reset }: AppError) {
     console.error(error);
   }, [error]);
 
-  return (
-    <>
-      <ErrorSection onClick={() => reset()} />
-    </>
-  );
+  return <ErrorSection onClick={() => reset()} />;
 }

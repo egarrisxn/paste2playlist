@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
-    <div className="mx-auto grid min-h-dvh w-full place-items-center px-4">
+    <div className="mx-auto grid min-h-dvh w-full place-items-center">
       <section className="grid px-4">
         <div className="flex flex-auto flex-col items-center justify-center text-center sm:flex-row">
           <h1 className="text-7xl font-bold sm:mr-5 sm:border-r-2 sm:border-foreground sm:pr-5 sm:text-2xl">
