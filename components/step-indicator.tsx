@@ -11,24 +11,27 @@ export default function StepIndicator({
   isConnected,
 }: StepIndicatorProps) {
   return (
-    <div className="mb-8 flex items-center justify-center gap-2">
+    <div className="mb-8 grid grid-cols-3 gap-4 sm:gap-5">
       <StepBadge
         number={1}
-        label="Connect"
+        label="Log in with Spotify"
+        description="Connect your Spotify account"
         active={step === "connect"}
         done={isConnected}
       />
-      <div className="h-px w-8 bg-border" />
+
       <StepBadge
         number={2}
-        label="Paste List"
+        label="Paste an Albums List"
+        description="One per line: Artist - Album"
         active={step === "input"}
         done={step === "processing" || step === "results"}
       />
-      <div className="h-px w-8 bg-border" />
+
       <StepBadge
         number={3}
-        label="Create"
+        label="Generate New Playlist"
+        description="All tracks added automatically"
         active={step === "processing" || step === "results"}
         done={step === "results"}
       />

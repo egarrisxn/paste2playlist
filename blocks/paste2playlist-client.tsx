@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Header from "@/components/header";
-import SetupAlert from "@/components/setup-alert";
+import Hero from "@/components/hero";
 import ErrorAlert from "@/components/error-alert";
 import StepIndicator from "@/components/step-indicator";
-import ConnectCard from "@/components/connect-card";
+import ConnectButton from "@/components/connect-button";
 import InputCard from "@/components/input-card";
 import ProcessingCard from "@/components/processing-card";
 import ResultsView from "@/components/results-view";
-import PrivacyNotice from "@/components/privacy-notice";
 import {
   getToken,
   getStoredProfile,
@@ -145,20 +144,20 @@ export default function Paste2PlaylistClient() {
   ]);
 
   return (
-    <>
+    <div>
       <Header
         isConnected={auth.isConnected}
         profile={auth.profile}
         onDisconnect={handleDisconnect}
       />
 
-      <div className="container mx-auto max-w-2xl px-4 py-8">
-        {!auth.isConnected && <SetupAlert />}
+      <div className="container mx-auto max-w-3xl space-y-8 px-4 pt-16 pb-8">
+        {!auth.isConnected && <Hero />}
         <ErrorAlert message={error} />
 
         <StepIndicator step={auth.step} isConnected={auth.isConnected} />
 
-        {auth.step === "connect" && <ConnectCard onConnect={handleConnect} />}
+        {auth.step === "connect" && <ConnectButton onConnect={handleConnect} />}
 
         {auth.step === "input" && (
           <InputCard
@@ -191,8 +190,13 @@ export default function Paste2PlaylistClient() {
           />
         )}
 
-        <PrivacyNotice />
+        <div className="mt-8 p-3">
+          <p className="text-center text-xs text-muted-foreground">
+            We only request permission to create playlists. Your data stays
+            private.
+          </p>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

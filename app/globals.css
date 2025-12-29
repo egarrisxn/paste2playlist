@@ -115,6 +115,10 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@theme {
+  --animate-spin-slow: spin 2.5s linear infinite;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

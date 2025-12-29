@@ -19,9 +19,11 @@ export default function Header({
   return (
     <header>
       <div className="container mx-auto flex items-center justify-between p-4">
-        <div className="flex items-center gap-2">
-          <Disc3 className="size-8 text-[#1DB954]" />
-          <h1 className="text-xl font-bold">Paste2Playlist</h1>
+        <div className="flex items-center gap-0.5">
+          <Disc3 className="size-8 stroke-[2.5] text-[#1DB954]" />
+          <h1 className="text-2xl leading-none font-black tracking-tighter text-shadow-lg">
+            Paste<span className="text-[#1DB954]">2</span>Playlist
+          </h1>
         </div>
 
         {isConnected && profile && (

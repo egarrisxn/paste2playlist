@@ -1,5 +1,3 @@
-//! ============ General Types ============
-
 export type Step = "connect" | "input" | "processing" | "results";
 
 export type ProcessingPhase =
@@ -16,14 +14,14 @@ export interface Progress {
   label: string;
 }
 
-//! ============ Error Handling ============
+// ============ Error Handling ============
 
 export interface AppError {
   error: Error;
   reset: () => void;
 }
 
-//! ============ Token Store (localStorage) ============
+// ============ Token Store (localStorage) ============
 
 export interface TokenData {
   access_token: string;
@@ -33,7 +31,7 @@ export interface TokenData {
   scope: string;
 }
 
-//! ============ Spotify Data ============
+// ============ Spotify API Data ============
 
 export interface SpotifyProfile {
   id: string;
@@ -64,7 +62,7 @@ export interface MatchResult {
   error?: string;
 }
 
-//! ============ Auth Flow ============
+// ============ Auth Flow ============
 
 export type AuthSnapshot = {
   isConnected: boolean;

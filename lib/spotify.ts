@@ -1,16 +1,14 @@
+import {
+  SPOTIFY_AUTH_URL,
+  SPOTIFY_TOKEN_URL,
+  SPOTIFY_API_BASE_URL,
+} from "./constants";
 import type {
   TokenData,
   SpotifyProfile,
   SpotifyAlbum,
   ParsedLine,
 } from "./types";
-
-// Spotify PKCE Auth + API utilities for Paste2Playlist
-// All client-side - no server required
-
-const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize";
-const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
-const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
 // ============ PKCE Helpers ============
 
@@ -50,21 +48,6 @@ export async function createPkcePair(): Promise<{
 }
 
 // ============ Token Store (localStorage) ============
-
-// export interface TokenData {
-//   access_token: string
-//   refresh_token: string
-//   expires_at: number
-//   token_type: string
-//   scope: string
-// }
-
-// export interface SpotifyProfile {
-//   id: string
-//   display_name: string
-//   email?: string
-//   images?: { url: string }[]
-// }
 
 const TOKEN_KEY = "paste2playlist_token";
 const PROFILE_KEY = "paste2playlist_profile";
@@ -234,7 +217,7 @@ export async function spotifyFetch(
   const headers = new Headers(options.headers);
   headers.set("Authorization", `Bearer ${token.access_token}`);
 
-  let response = await fetch(`${SPOTIFY_API_BASE}${path}`, {
+  let response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
     ...options,
     headers,
   });
@@ -246,7 +229,7 @@ export async function spotifyFetch(
       10
     );
     await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-    response = await fetch(`${SPOTIFY_API_BASE}${path}`, {
+    response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
       ...options,
       headers,
     });
@@ -258,7 +241,7 @@ export async function spotifyFetch(
     try {
       token = await refreshAccessToken(token.refresh_token, clientId);
       headers.set("Authorization", `Bearer ${token.access_token}`);
-      response = await fetch(`${SPOTIFY_API_BASE}${path}`, {
+      response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
         ...options,
         headers,
       });
@@ -277,7 +260,10 @@ export async function spotifyFetch(
 
 export async function getMe(clientId: string): Promise<SpotifyProfile> {
   const response = await spotifyFetch("/me", {}, clientId);
-  if (!response.ok) throw new Error("Failed to fetch profile");
+  if (!response.ok)
+    throw new Error(
+      "This app is in testing mode. Ask the app owner to add your Spotify email to the allowlist."
+    );
   const profile = await response.json();
   setStoredProfile(profile);
   return profile;
@@ -306,15 +292,6 @@ export async function createPlaylist(
   if (!response.ok) throw new Error("Failed to create playlist");
   return response.json();
 }
-
-// export interface SpotifyAlbum {
-//   id: string
-//   name: string
-//   artists: { name: string }[]
-//   album_type: string
-//   external_urls: { spotify: string }
-//   images: { url: string }[]
-// }
 
 export async function searchAlbum(
   artist: string,
@@ -491,13 +468,6 @@ export async function asyncPool<T, R>(
 }
 
 // ============ Input Parsing ============
-
-// export interface ParsedLine {
-//   original: string
-//   artist?: string
-//   album?: string
-//   error?: string
-// }
 
 export function parseAlbumList(input: string): ParsedLine[] {
   const lines = input.split("\n").filter((line) => line.trim());
