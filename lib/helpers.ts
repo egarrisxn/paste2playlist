@@ -1,6 +1,9 @@
+import type { Dispatch, SetStateAction } from "react";
 import {
   parseAlbumList,
+  parseArtistYearList,
   searchAlbum,
+  findFullLengthAlbumByYear,
   getAllAlbumTracks,
   createPlaylist,
   addTracksToPlaylist,
@@ -14,24 +17,62 @@ import type {
   ParsedLine,
   MatchResult,
   Progress,
+  InputMode,
 } from "@/lib/types";
 
-export async function runCreatePlaylistFlow(args: {
-  albumInput: string;
-  profile: SpotifyProfile | null;
-  playlistName: string;
-  playlistDescription: string;
-  isPublic: boolean;
-  clientId: string;
-  setError: React.Dispatch<React.SetStateAction<string>>;
-  setStep: React.Dispatch<React.SetStateAction<Step>>;
-  setProcessingPhase: React.Dispatch<React.SetStateAction<ProcessingPhase>>;
-  setMatchResults: React.Dispatch<React.SetStateAction<MatchResult[]>>;
-  setProgress: React.Dispatch<React.SetStateAction<Progress>>;
-  setTotalTracks: React.Dispatch<React.SetStateAction<number>>;
-  setPlaylistUrl: React.Dispatch<React.SetStateAction<string>>;
-}) {
+type StateSetters = {
+  setError: Dispatch<SetStateAction<string>>;
+  setStep: Dispatch<SetStateAction<Step>>;
+  setProcessingPhase: Dispatch<SetStateAction<ProcessingPhase>>;
+  setMatchResults: Dispatch<SetStateAction<MatchResult[]>>;
+  setProgress: Dispatch<SetStateAction<Progress>>;
+  setTotalTracks: Dispatch<SetStateAction<number>>;
+  setPlaylistUrl: Dispatch<SetStateAction<string>>;
+};
+
+function dedupeParsedLines(
+  mode: InputMode,
+  parsed: ParsedLine[]
+): ParsedLine[] {
+  const seen = new Set<string>();
+  const out: ParsedLine[] = [];
+
+  for (const p of parsed) {
+    if (mode === "album") {
+      if (p.artist && p.album) {
+        const key = `${p.artist.toLowerCase()}|${p.album.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      out.push(p);
+      continue;
+    }
+
+    // mode === "year"
+    if (p.artist && typeof p.year === "number") {
+      const key = `${p.artist.toLowerCase()}|${p.year}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push(p);
+  }
+
+  return out;
+}
+
+export async function runCreatePlaylistFlow(
+  args: {
+    mode: InputMode;
+    albumInput: string;
+    profile: SpotifyProfile | null;
+    playlistName: string;
+    playlistDescription: string;
+    isPublic: boolean;
+    clientId: string;
+  } & StateSetters
+) {
   const {
+    mode,
     albumInput,
     profile,
     playlistName,
@@ -47,8 +88,13 @@ export async function runCreatePlaylistFlow(args: {
     setPlaylistUrl,
   } = args;
 
-  if (!albumInput.trim()) {
-    setError("Please paste your album list first.");
+  const input = albumInput.trim();
+  if (!input) {
+    setError(
+      mode === "year"
+        ? "Please paste your Artist - Year list first."
+        : "Please paste your album list first."
+    );
     return;
   }
 
@@ -58,7 +104,10 @@ export async function runCreatePlaylistFlow(args: {
   setMatchResults([]);
 
   try {
-    const parsed = parseAlbumList(albumInput);
+    const parsed: ParsedLine[] =
+      mode === "year"
+        ? (parseArtistYearList(input) as ParsedLine[])
+        : parseAlbumList(input);
 
     setProgress({
       current: 0,
@@ -66,20 +115,7 @@ export async function runCreatePlaylistFlow(args: {
       label: "Parsing input...",
     });
 
-    const seen = new Set<string>();
-    const uniqueParsed: ParsedLine[] = [];
-
-    for (const p of parsed) {
-      if (p.artist && p.album) {
-        const key = `${p.artist.toLowerCase()}|${p.album.toLowerCase()}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueParsed.push(p);
-        }
-      } else {
-        uniqueParsed.push(p);
-      }
-    }
+    const uniqueParsed = dedupeParsedLines(mode, parsed);
 
     const initialResults: MatchResult[] = uniqueParsed
       .filter((p) => p.error)
@@ -92,22 +128,48 @@ export async function runCreatePlaylistFlow(args: {
     setProgress({
       current: 0,
       total: toMatch.length,
-      label: "Matching albums...",
+      label:
+        mode === "year"
+          ? "Matching artists to yearly albums..."
+          : "Matching albums...",
     });
     setProcessingPhase("matching");
 
-    const matchedResults = await asyncPool(4, toMatch, async (item) => {
-      const album = await searchAlbum(item.artist!, item.album!, clientId);
+    const matchedResults = await asyncPool(1, toMatch, async (item) => {
+      const album =
+        mode === "year"
+          ? await findFullLengthAlbumByYear(item.artist!, item.year!, clientId)
+          : await searchAlbum(item.artist!, item.album!, clientId);
 
       setProgress((prev) => ({
         current: prev.current + 1,
         total: toMatch.length,
-        label: `Matching: ${item.artist} - ${item.album}`,
+        label:
+          mode === "year"
+            ? `Matching: ${item.artist} - ${item.year}`
+            : `Matching: ${item.artist} - ${item.album}`,
       }));
 
       const result: MatchResult = album
-        ? { parsed: item, album }
-        : { parsed: item, error: "No good match found" };
+        ? {
+            parsed:
+              mode === "year"
+                ? {
+                    original: item.original,
+                    artist: item.artist,
+                    year: item.year,
+                    album: album.name,
+                  }
+                : item,
+            album,
+          }
+        : {
+            parsed: item,
+            error:
+              mode === "year"
+                ? `No full-length album found for ${item.year}`
+                : "No good match found",
+          };
 
       setMatchResults((prev) => [...prev, result]);
       return result;
@@ -117,7 +179,11 @@ export async function runCreatePlaylistFlow(args: {
     const successfulMatches = allResults.filter((r) => r.album);
 
     if (successfulMatches.length === 0) {
-      setError("No albums could be matched. Please check your input format.");
+      setError(
+        mode === "year"
+          ? "No yearly albums could be matched. Please check your input."
+          : "No albums could be matched. Please check your input format."
+      );
       setStep("input");
       return;
     }
@@ -130,7 +196,7 @@ export async function runCreatePlaylistFlow(args: {
     });
 
     let allTrackUris: string[] = [];
-    await asyncPool(4, successfulMatches, async (result) => {
+    await asyncPool(1, successfulMatches, async (result) => {
       const tracks = await getAllAlbumTracks(result.album!.id, clientId);
       allTrackUris = [...allTrackUris, ...tracks];
 
@@ -170,6 +236,7 @@ export async function runCreatePlaylistFlow(args: {
       total: allTrackUris.length,
       label: "Complete!",
     });
+
     setPlaylistUrl(playlist.external_urls.spotify);
     setProcessingPhase("done");
     setStep("results");

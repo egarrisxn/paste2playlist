@@ -1,13 +1,15 @@
 import {
+  SPOTIFY_API_BASE_URL,
   SPOTIFY_AUTH_URL,
   SPOTIFY_TOKEN_URL,
-  SPOTIFY_API_BASE_URL,
 } from "./constants";
 import type {
   TokenData,
+  TokenResponse,
   SpotifyProfile,
   SpotifyAlbum,
   ParsedLine,
+  ParsedLineWithYear,
 } from "./types";
 
 // ============ PKCE Helpers ============
@@ -22,9 +24,8 @@ export function generateRandomString(length: number): string {
 export function base64UrlEncode(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
+  for (let i = 0; i < bytes.byteLength; i++)
     binary += String.fromCharCode(bytes[i]);
-  }
   return btoa(binary)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -32,9 +33,7 @@ export function base64UrlEncode(buffer: ArrayBuffer): string {
 }
 
 export async function sha256(plain: string): Promise<ArrayBuffer> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(plain);
-  return crypto.subtle.digest("SHA-256", data);
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(plain));
 }
 
 export async function createPkcePair(): Promise<{
@@ -52,48 +51,44 @@ export async function createPkcePair(): Promise<{
 const TOKEN_KEY = "paste2playlist_token";
 const PROFILE_KEY = "paste2playlist_profile";
 
-export function getToken(): TokenData | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(TOKEN_KEY);
+function isBrowser(): boolean {
+  return typeof window !== "undefined";
+}
+
+function safeJsonParse<T>(raw: string | null): T | null {
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    return JSON.parse(raw) as T;
   } catch {
     return null;
   }
 }
 
-export function setToken(tokenResponse: {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type: string;
-  scope: string;
-}): void {
+export function getToken(): TokenData | null {
+  if (!isBrowser()) return null;
+  return safeJsonParse<TokenData>(localStorage.getItem(TOKEN_KEY));
+}
+
+export function setToken(tokenResponse: TokenResponse): void {
   const data: TokenData = {
     access_token: tokenResponse.access_token,
-    refresh_token: tokenResponse.refresh_token,
+    refresh_token: tokenResponse.refresh_token ?? "",
     expires_at: Date.now() + tokenResponse.expires_in * 1000,
     token_type: tokenResponse.token_type,
-    scope: tokenResponse.scope,
+    scope: tokenResponse.scope ?? "",
   };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(data));
 }
 
 export function clearToken(): void {
+  if (!isBrowser()) return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(PROFILE_KEY);
 }
 
 export function getStoredProfile(): SpotifyProfile | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(PROFILE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  if (!isBrowser()) return null;
+  return safeJsonParse<SpotifyProfile>(localStorage.getItem(PROFILE_KEY));
 }
 
 export function setStoredProfile(profile: SpotifyProfile): void {
@@ -103,8 +98,8 @@ export function setStoredProfile(profile: SpotifyProfile): void {
 export function isTokenExpired(): boolean {
   const token = getToken();
   if (!token) return true;
-  // Add 60s buffer
-  return Date.now() > token.expires_at - 60000;
+  // 60s buffer
+  return Date.now() > token.expires_at - 60_000;
 }
 
 // ============ Auth Flow ============
@@ -120,10 +115,11 @@ export function buildAuthorizeUrl(
     client_id: clientId,
     scope: "playlist-modify-private playlist-modify-public",
     redirect_uri: redirectUri,
-    state: state,
+    state,
     code_challenge_method: "S256",
     code_challenge: codeChallenge,
   });
+
   return `${SPOTIFY_AUTH_URL}?${params.toString()}`;
 }
 
@@ -136,7 +132,7 @@ export async function exchangeCodeForToken(
   const params = new URLSearchParams({
     client_id: clientId,
     grant_type: "authorization_code",
-    code: code,
+    code,
     redirect_uri: redirectUri,
     code_verifier: verifier,
   });
@@ -148,11 +144,11 @@ export async function exchangeCodeForToken(
   });
 
   if (!response.ok) {
-    const error = await response.text();
+    const error = await response.text().catch(() => "");
     throw new Error(`Token exchange failed: ${error}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as TokenResponse;
   setToken(data);
   return getToken()!;
 }
@@ -173,16 +169,16 @@ export async function refreshAccessToken(
     body: params.toString(),
   });
 
-  if (!response.ok) {
-    throw new Error("Token refresh failed");
-  }
+  if (!response.ok) throw new Error("Token refresh failed");
 
-  const data = await response.json();
+  const data = (await response.json()) as TokenResponse;
+
   // Spotify may or may not return a new refresh_token
   setToken({
     ...data,
-    refresh_token: data.refresh_token || refreshToken,
+    refresh_token: data.refresh_token ?? refreshToken,
   });
+
   return getToken()!;
 }
 
@@ -190,18 +186,16 @@ export async function refreshAccessToken(
 
 let isRefreshing = false;
 
+const artistIdCache = new Map<string, string>();
+
 export async function spotifyFetch(
   path: string,
   options: RequestInit = {},
   clientId: string
 ): Promise<Response> {
   let token = getToken();
+  if (!token) throw new Error("Not authenticated");
 
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
-  // Check if token is expired and refresh if needed
   if (isTokenExpired() && !isRefreshing) {
     isRefreshing = true;
     try {
@@ -222,20 +216,30 @@ export async function spotifyFetch(
     headers,
   });
 
-  // Handle rate limiting
+  // 429 rate limit: retry with Retry-After + jitter
   if (response.status === 429) {
-    const retryAfter = Number.parseInt(
-      response.headers.get("Retry-After") || "1",
-      10
-    );
-    await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-    response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
-      ...options,
-      headers,
-    });
+    let attempts = 0;
+
+    while (response.status === 429 && attempts < 10) {
+      const retryAfterHeader = response.headers.get("Retry-After");
+      const retryAfterSec = retryAfterHeader
+        ? Number.parseInt(retryAfterHeader, 10)
+        : 1;
+      const jitterMs = Math.floor(Math.random() * 350);
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, retryAfterSec * 1000 + jitterMs)
+      );
+
+      response = await fetch(`${SPOTIFY_API_BASE_URL}${path}`, {
+        ...options,
+        headers,
+      });
+      attempts += 1;
+    }
   }
 
-  // Handle 401 - try refresh once
+  // 401: try refresh once
   if (response.status === 401 && !isRefreshing) {
     isRefreshing = true;
     try {
@@ -260,11 +264,12 @@ export async function spotifyFetch(
 
 export async function getMe(clientId: string): Promise<SpotifyProfile> {
   const response = await spotifyFetch("/me", {}, clientId);
-  if (!response.ok)
+  if (!response.ok) {
     throw new Error(
       "This app is in testing mode. Ask the app owner to add your Spotify email to the allowlist."
     );
-  const profile = await response.json();
+  }
+  const profile = (await response.json()) as SpotifyProfile;
   setStoredProfile(profile);
   return profile;
 }
@@ -281,11 +286,7 @@ export async function createPlaylist(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        description,
-        public: isPublic,
-      }),
+      body: JSON.stringify({ name, description, public: isPublic }),
     },
     clientId
   );
@@ -293,12 +294,147 @@ export async function createPlaylist(
   return response.json();
 }
 
+export async function searchArtistId(
+  artistName: string,
+  clientId: string
+): Promise<string | null> {
+  const key = artistName.toLowerCase().trim();
+  const cached = artistIdCache.get(key);
+  if (cached) return cached;
+
+  const q = encodeURIComponent(`artist:"${artistName}"`);
+  const res = await spotifyFetch(
+    `/search?q=${q}&type=artist&limit=5`,
+    {},
+    clientId
+  );
+  if (!res.ok) throw new Error("Failed to search artist");
+  const data = await res.json();
+
+  const items: { id: string; name: string }[] = data.artists?.items ?? [];
+  if (!items.length) return null;
+
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .trim();
+  const target = norm(artistName);
+
+  const id = (items.find((a) => norm(a.name) === target) ?? items[0]).id;
+  artistIdCache.set(key, id);
+  return id;
+}
+
+type SpotifyArtistAlbumItem = {
+  id: string;
+  name: string;
+  album_type: string;
+  release_date?: string;
+  release_date_precision?: string;
+  artists: { name: string }[];
+  external_urls?: { spotify: string };
+  images?: { url: string }[];
+};
+
+function releaseYear(item: { release_date?: string }): number | null {
+  if (!item.release_date) return null;
+  const y = Number(item.release_date.slice(0, 4));
+  return Number.isFinite(y) ? y : null;
+}
+
+function normalizeTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\(.*?\)/g, "")
+    .replace(
+      /\b(deluxe|expanded|remaster(ed)?|anniversary|clean|explicit|edition|version)\b/g,
+      ""
+    )
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dedupeByNormalizedName(
+  items: SpotifyArtistAlbumItem[]
+): SpotifyArtistAlbumItem[] {
+  const map = new Map<string, SpotifyArtistAlbumItem>();
+
+  for (const it of items) {
+    const key = normalizeTitle(it.name);
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, it);
+      continue;
+    }
+
+    const prefer =
+      (existing.album_type !== "album" && it.album_type === "album") ||
+      (existing.release_date &&
+        it.release_date &&
+        it.release_date < existing.release_date);
+
+    if (prefer) map.set(key, it);
+  }
+
+  return [...map.values()];
+}
+
+export async function findFullLengthAlbumByYear(
+  artistName: string,
+  year: number,
+  clientId: string,
+  market = "US"
+): Promise<SpotifyAlbum | null> {
+  const artistId = await searchArtistId(artistName, clientId);
+  if (!artistId) return null;
+
+  const collected: SpotifyArtistAlbumItem[] = [];
+  let offset = 0;
+  const limit = 50;
+
+  while (true) {
+    const path = `/artists/${artistId}/albums?include_groups=album&limit=${limit}&offset=${offset}&market=${market}`;
+    const res = await spotifyFetch(path, {}, clientId);
+    if (!res.ok) throw new Error("Failed to fetch artist albums");
+    const data = await res.json();
+
+    const items: SpotifyArtistAlbumItem[] = data.items ?? [];
+    collected.push(...items);
+
+    if (!data.next || items.length < limit) break;
+    offset += limit;
+  }
+
+  const inYear = collected.filter((a) => releaseYear(a) === year);
+  if (!inYear.length) return null;
+
+  const deduped = dedupeByNormalizedName(inYear).sort((a, b) =>
+    (a.release_date ?? "").localeCompare(b.release_date ?? "")
+  );
+
+  const chosen = deduped[0];
+  if (!chosen) return null;
+
+  return {
+    id: chosen.id,
+    name: chosen.name,
+    artists: chosen.artists,
+    album_type: chosen.album_type,
+    external_urls: chosen.external_urls ?? { spotify: "" },
+    images: chosen.images ?? [],
+    release_date: chosen.release_date,
+    release_date_precision: chosen.release_date_precision,
+  };
+}
+
 export async function searchAlbum(
   artist: string,
   album: string,
   clientId: string
 ): Promise<SpotifyAlbum | null> {
-  // Attempt 1: Structured search
   const query1 = encodeURIComponent(`album:"${album}" artist:"${artist}"`);
   const response1 = await spotifyFetch(
     `/search?q=${query1}&type=album&limit=3`,
@@ -311,7 +447,6 @@ export async function searchAlbum(
     if (best1) return best1;
   }
 
-  // Attempt 2: Relaxed search
   const query2 = encodeURIComponent(`${album} ${artist}`);
   const response2 = await spotifyFetch(
     `/search?q=${query2}&type=album&limit=5`,
@@ -351,7 +486,6 @@ function findBestMatch(
     const albumArtists = a.artists.map((ar) => normalize(ar.name));
     const albumName = normalize(a.name);
 
-    // Artist match
     if (
       albumArtists.some(
         (ar) => ar.includes(normArtist) || normArtist.includes(ar)
@@ -360,17 +494,11 @@ function findBestMatch(
       score += 3;
     }
 
-    // Album name match
-    if (albumName === normAlbum) {
-      score += 3;
-    } else if (albumName.includes(normAlbum) || normAlbum.includes(albumName)) {
+    if (albumName === normAlbum) score += 3;
+    else if (albumName.includes(normAlbum) || normAlbum.includes(albumName))
       score += 2;
-    }
 
-    // Prefer full albums
-    if (a.album_type === "album") {
-      score += 1;
-    }
+    if (a.album_type === "album") score += 1;
 
     if (score > bestScore) {
       bestScore = score;
@@ -378,7 +506,6 @@ function findBestMatch(
     }
   }
 
-  // Require minimum score of 3 for a good match
   return bestScore >= 3 ? bestAlbum : null;
 }
 
@@ -399,9 +526,7 @@ export async function getAllAlbumTracks(
     if (!response.ok) throw new Error("Failed to fetch album tracks");
     const data = await response.json();
 
-    for (const track of data.items) {
-      trackUris.push(track.uri);
-    }
+    for (const track of data.items) trackUris.push(track.uri);
 
     if (data.items.length < limit || !data.next) break;
     offset += limit;
@@ -415,12 +540,17 @@ export async function addTracksToPlaylist(
   uris: string[],
   clientId: string
 ): Promise<void> {
-  // Dedupe URIs
   const uniqueUris = [...new Set(uris)];
 
-  // Add in batches of 100
   for (let i = 0; i < uniqueUris.length; i += 100) {
     const batch = uniqueUris.slice(i, i + 100);
+
+    console.log(
+      `[ADD] batch ${Math.floor(i / 100) + 1}/${Math.ceil(uniqueUris.length / 100)} (${
+        batch.length
+      } tracks)`
+    );
+
     const response = await spotifyFetch(
       `/playlists/${playlistId}/tracks`,
       {
@@ -430,7 +560,13 @@ export async function addTracksToPlaylist(
       },
       clientId
     );
-    if (!response.ok) throw new Error("Failed to add tracks to playlist");
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Failed to add tracks to playlist (status ${response.status}) ${body}`
+      );
+    }
   }
 }
 
@@ -442,24 +578,22 @@ export async function asyncPool<T, R>(
   iteratorFn: (item: T, index: number) => Promise<R>
 ): Promise<R[]> {
   const results: R[] = [];
-  const executing: Promise<void>[] = [];
+  const executing = new Set<Promise<void>>();
 
   for (let i = 0; i < items.length; i++) {
-    const item = items[i];
     const p = Promise.resolve()
-      .then(() => iteratorFn(item, i))
+      .then(() => iteratorFn(items[i], i))
       .then((result) => {
         results[i] = result;
+      })
+      .finally(() => {
+        executing.delete(p);
       });
 
-    executing.push(p as unknown as Promise<void>);
+    executing.add(p);
 
-    if (executing.length >= poolLimit) {
+    if (executing.size >= poolLimit) {
       await Promise.race(executing);
-      executing.splice(
-        executing.findIndex((e) => e === p),
-        1
-      );
     }
   }
 
@@ -475,7 +609,6 @@ export function parseAlbumList(input: string): ParsedLine[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Match various dash types: - – —
     const match = trimmed.match(/^(.+?)[\s]*[-–—][\s]*(.+)$/);
 
     if (match) {
@@ -485,9 +618,31 @@ export function parseAlbumList(input: string): ParsedLine[] {
         album: match[2].trim(),
       });
     } else {
+      results.push({ original: trimmed, error: "Could not parse" });
+    }
+  }
+
+  return results;
+}
+
+export function parseArtistYearList(input: string): ParsedLineWithYear[] {
+  const lines = input.split("\n").filter((line) => line.trim());
+  const results: ParsedLineWithYear[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^(.+?)[\s]*[-–—][\s]*(\d{4})$/);
+
+    if (match) {
       results.push({
         original: trimmed,
-        error: "Could not parse",
+        artist: match[1].trim(),
+        year: Number(match[2]),
+      });
+    } else {
+      results.push({
+        original: trimmed,
+        error: "Could not parse Artist - Year",
       });
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type SetStateAction } from "react";
 import Header from "@/components/header";
 import Hero from "@/components/hero";
 import ErrorAlert from "@/components/error-alert";
@@ -21,11 +21,12 @@ import {
 import { clientId, redirectUri } from "@/lib/env";
 import { runCreatePlaylistFlow } from "@/lib/helpers";
 import type {
-  Step,
   ProcessingPhase,
   MatchResult,
   Progress,
   AuthSnapshot,
+  InputMode,
+  Step,
 } from "@/lib/types";
 
 const initialAuth: AuthSnapshot = {
@@ -34,8 +35,19 @@ const initialAuth: AuthSnapshot = {
   step: "connect",
 };
 
+const initialProgress: Progress = { current: 0, total: 0, label: "" };
+
 export default function Paste2PlaylistClient() {
-  const [auth, setAuth] = useState<AuthSnapshot>(initialAuth);
+  const [auth, setAuth] = useState<AuthSnapshot>(() => {
+    const token = getToken();
+    const storedProfile = getStoredProfile();
+    if (token && storedProfile) {
+      return { isConnected: true, profile: storedProfile, step: "input" };
+    }
+    return initialAuth;
+  });
+  const [mode, setMode] = useState<InputMode>("album");
+
   const [albumInput, setAlbumInput] = useState("");
   const [playlistName, setPlaylistName] = useState("My Albums");
   const [playlistDescription, setPlaylistDescription] = useState(
@@ -45,57 +57,49 @@ export default function Paste2PlaylistClient() {
 
   const [processingPhase, setProcessingPhase] =
     useState<ProcessingPhase>("parsing");
-  const [progress, setProgress] = useState<Progress>({
-    current: 0,
-    total: 0,
-    label: "",
-  });
+  const [progress, setProgress] = useState<Progress>(initialProgress);
   const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
 
   const [playlistUrl, setPlaylistUrl] = useState("");
   const [totalTracks, setTotalTracks] = useState(0);
   const [error, setError] = useState("");
 
-  const setStep: React.Dispatch<React.SetStateAction<Step>> = useCallback(
-    (next) => {
-      setAuth((prev) => ({
-        ...prev,
-        step: typeof next === "function" ? next(prev.step) : next,
-      }));
-    },
-    []
-  );
+  const setStep = useCallback((value: SetStateAction<Step>) => {
+    setAuth((prev) => {
+      const next =
+        typeof value === "function"
+          ? (value as (prevStep: Step) => Step)(prev.step)
+          : value;
+      return { ...prev, step: next };
+    });
+  }, []);
 
   useEffect(() => {
     const token = getToken();
     const storedProfile = getStoredProfile();
-
     if (!token || !storedProfile) return;
 
-    queueMicrotask(() => {
-      setAuth({ isConnected: true, profile: storedProfile, step: "input" });
-    });
-
+    // validate/refresh profile asynchronously
+    let mounted = true;
     getMe(clientId)
       .then((fresh) => {
-        queueMicrotask(() => {
+        if (mounted) {
           setAuth({ isConnected: true, profile: fresh, step: "input" });
-        });
+        }
       })
       .catch(() => {
         clearToken();
-        queueMicrotask(() => setAuth(initialAuth));
+        if (mounted) {
+          setAuth(initialAuth);
+        }
       });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleConnect = useCallback(async () => {
-    if (!clientId || !redirectUri) {
-      setError(
-        "Missing Spotify configuration. Please set NEXT_PUBLIC_SPOTIFY_CLIENT_ID and NEXT_PUBLIC_SPOTIFY_REDIRECT_URI."
-      );
-      return;
-    }
-
     const { verifier, challenge } = await createPkcePair();
     const state = generateRandomString(16);
 
@@ -109,17 +113,21 @@ export default function Paste2PlaylistClient() {
   const handleDisconnect = useCallback(() => {
     clearToken();
     setAuth(initialAuth);
+
     setAlbumInput("");
     setMatchResults([]);
     setPlaylistUrl("");
     setTotalTracks(0);
     setError("");
+
     setProcessingPhase("parsing");
-    setProgress({ current: 0, total: 0, label: "" });
+    setProgress(initialProgress);
+    setMode("album");
   }, []);
 
   const handleCreatePlaylist = useCallback(() => {
     void runCreatePlaylistFlow({
+      mode,
       albumInput,
       profile: auth.profile,
       playlistName,
@@ -135,12 +143,19 @@ export default function Paste2PlaylistClient() {
       setPlaylistUrl,
     });
   }, [
+    mode,
     albumInput,
     auth.profile,
     playlistName,
     playlistDescription,
     isPublic,
+    setError,
     setStep,
+    setProcessingPhase,
+    setMatchResults,
+    setProgress,
+    setTotalTracks,
+    setPlaylistUrl,
   ]);
 
   return (
@@ -161,6 +176,8 @@ export default function Paste2PlaylistClient() {
 
         {auth.step === "input" && (
           <InputCard
+            mode={mode}
+            setMode={setMode}
             albumInput={albumInput}
             setAlbumInput={setAlbumInput}
             playlistName={playlistName}

@@ -1,12 +1,12 @@
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Progress as ProgressBar } from "@/components/ui/progress";
 import PhaseBadge from "@/components/phase-badge";
-import type { ProcessingPhase, MatchResult } from "@/lib/types";
+import type { ProcessingPhase, MatchResult, Progress } from "@/lib/types";
 
 interface ProcessingCardProps {
   processingPhase: ProcessingPhase;
-  progress: { current: number; total: number; label: string };
+  progress: Progress;
   matchResults: MatchResult[];
 }
 
@@ -15,6 +15,9 @@ export default function ProcessingCard({
   progress,
   matchResults,
 }: ProcessingCardProps) {
+  const pct =
+    progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
+
   return (
     <Card>
       <CardHeader>
@@ -59,28 +62,28 @@ export default function ProcessingCard({
             </span>
           </div>
 
-          <Progress
-            value={
-              progress.total > 0 ? (progress.current / progress.total) * 100 : 0
-            }
-          />
+          <ProgressBar value={pct} />
         </div>
 
         {matchResults.length > 0 && (
           <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-            {matchResults.map((result, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-sm">
-                {result.album ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-[#1DB954]" />
-                ) : (
-                  <XCircle className="size-4 shrink-0 text-destructive" />
-                )}
-                <span className="truncate">
-                  {result.parsed.artist} -{" "}
-                  {result.parsed.album || result.parsed.original}
-                </span>
-              </div>
-            ))}
+            {matchResults.map((result) => {
+              const key = result.parsed.original;
+              const label = `${result.parsed.artist ?? ""} - ${
+                result.parsed.album || result.parsed.original
+              }`.trim();
+
+              return (
+                <div key={key} className="flex items-center gap-2 text-sm">
+                  {result.album ? (
+                    <CheckCircle2 className="size-4 shrink-0 text-[#1DB954]" />
+                  ) : (
+                    <XCircle className="size-4 shrink-0 text-destructive" />
+                  )}
+                  <span className="truncate">{label}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>

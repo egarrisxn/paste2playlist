@@ -17,3 +17,22 @@ export const clientId = (() => {
   }
   return v;
 })();
+
+// function requirePublicEnv(name: string): string {
+//   const v = process.env[name];
+//   if (!v) {
+//     throw new Error(`Missing ${name}. Check .env.local or deployment env.`);
+//   }
+//   return v;
+// }
+
+// export const SPOTIFY_REDIRECT_URI = requirePublicEnv(
+//   "NEXT_PUBLIC_SPOTIFY_REDIRECT_URI"
+// );
+
+// export const SPOTIFY_CLIENT_ID = requirePublicEnv(
+//   "NEXT_PUBLIC_SPOTIFY_CLIENT_ID"
+// );
+
+// export const redirectUri = SPOTIFY_REDIRECT_URI;
+// export const clientId = SPOTIFY_CLIENT_ID;

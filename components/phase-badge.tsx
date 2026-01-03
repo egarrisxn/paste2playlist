@@ -8,17 +8,18 @@ interface PhaseBadgeProps {
   label: string;
 }
 
+const PHASES: ProcessingPhase[] = [
+  "parsing",
+  "matching",
+  "fetching",
+  "creating",
+  "adding",
+  "done",
+];
+
 export default function PhaseBadge({ phase, current, label }: PhaseBadgeProps) {
-  const phases: ProcessingPhase[] = [
-    "parsing",
-    "matching",
-    "fetching",
-    "creating",
-    "adding",
-    "done",
-  ];
-  const phaseIdx = phases.indexOf(phase);
-  const currentIdx = phases.indexOf(current);
+  const phaseIdx = PHASES.indexOf(phase);
+  const currentIdx = PHASES.indexOf(current);
 
   const isDone = phaseIdx < currentIdx;
   const isActive = phase === current;

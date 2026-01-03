@@ -14,18 +14,26 @@ import { Button } from "@/components/ui/button";
 import { exchangeCodeForToken, getMe } from "@/lib/spotify";
 import { clientId, redirectUri } from "@/lib/env";
 
+type Status = "loading" | "error";
+
+function clearAuthSessionStorage() {
+  sessionStorage.removeItem("spotify_code_verifier");
+  sessionStorage.removeItem("spotify_auth_state");
+}
+
 export default function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<"loading" | "error">("loading");
+
+  const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    async function handleCallback() {
-      const code = searchParams.get("code");
-      const state = searchParams.get("state");
-      const error = searchParams.get("error");
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+    const error = searchParams.get("error");
 
+    async function run() {
       if (error) {
         setStatus("error");
         setErrorMessage(
@@ -33,43 +41,39 @@ export default function CallbackHandler() {
             ? "Authorization was cancelled."
             : `Spotify error: ${error}`
         );
+        clearAuthSessionStorage();
         return;
       }
 
       if (!code) {
         setStatus("error");
         setErrorMessage("No authorization code received from Spotify.");
+        clearAuthSessionStorage();
         return;
       }
 
-      // Validate state
       const storedState = sessionStorage.getItem("spotify_auth_state");
-      if (state !== storedState) {
+      if (!storedState || state !== storedState) {
         setStatus("error");
         setErrorMessage("State mismatch. Please try connecting again.");
+        clearAuthSessionStorage();
         return;
       }
 
-      // Get code verifier
       const verifier = sessionStorage.getItem("spotify_code_verifier");
       if (!verifier) {
         setStatus("error");
         setErrorMessage("Missing code verifier. Please try connecting again.");
+        clearAuthSessionStorage();
         return;
       }
 
       try {
-        // Exchange code for token
         await exchangeCodeForToken(code, verifier, redirectUri, clientId);
 
-        // Fetch and store profile
         await getMe(clientId);
 
-        // Clear session storage
-        sessionStorage.removeItem("spotify_code_verifier");
-        sessionStorage.removeItem("spotify_auth_state");
-
-        // Redirect to home
+        clearAuthSessionStorage();
         router.push("/");
       } catch (err) {
         setStatus("error");
@@ -78,10 +82,11 @@ export default function CallbackHandler() {
             ? err.message
             : "Failed to complete authentication."
         );
+        clearAuthSessionStorage();
       }
     }
 
-    handleCallback();
+    void run();
   }, [searchParams, router]);
 
   if (status === "loading") {

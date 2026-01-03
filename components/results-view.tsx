@@ -16,8 +16,11 @@ export default function ResultsView({
   totalTracks,
   createAnotherHref,
 }: ResultsViewProps) {
-  const successCount = matchResults.filter((r) => r.album).length;
-  const failedCount = matchResults.filter((r) => r.error).length;
+  const matched = matchResults.filter((r) => r.album);
+  const failed = matchResults.filter((r) => r.error);
+
+  const successCount = matched.length;
+  const failedCount = failed.length;
 
   return (
     <div className="space-y-6">
@@ -72,40 +75,44 @@ export default function ResultsView({
           </CardHeader>
           <CardContent>
             <div className="max-h-64 space-y-2 overflow-y-auto">
-              {matchResults
-                .filter((r) => r.album)
-                .map((result, idx) => (
+              {matched.map((result) => {
+                const album = result.album!;
+                const key = `${album.id}:${result.parsed.original}`;
+
+                const img = album.images?.[2]?.url ?? album.images?.[0]?.url;
+
+                return (
                   <div
-                    key={idx}
+                    key={key}
                     className="flex items-center gap-3 rounded-md p-2 hover:bg-muted"
                   >
-                    {result.album!.images?.[2] && (
+                    {img && (
                       <img
-                        src={result.album!.images[2].url || "/placeholder.svg"}
-                        alt={result.album!.name}
+                        src={img || "/placeholder.svg"}
+                        alt={album.name}
                         className="size-10 rounded"
                       />
                     )}
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">
-                        {result.album!.name}
-                      </p>
+                      <p className="truncate font-medium">{album.name}</p>
                       <p className="truncate text-sm text-muted-foreground">
-                        {result.album!.artists.map((a) => a.name).join(", ")}
+                        {album.artists.map((a) => a.name).join(", ")}
                       </p>
                     </div>
 
                     <a
-                      href={result.album!.external_urls.spotify}
+                      href={album.external_urls.spotify}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-muted-foreground hover:text-foreground"
+                      aria-label="Open album in Spotify"
                     >
                       <ExternalLink className="size-4" />
                     </a>
                   </div>
-                ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -120,20 +127,18 @@ export default function ResultsView({
           </CardHeader>
           <CardContent>
             <div className="max-h-48 space-y-2 overflow-y-auto">
-              {matchResults
-                .filter((r) => r.error)
-                .map((result, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-2 rounded-md bg-destructive/5 p-2 text-sm"
-                  >
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
-                    <div>
-                      <p className="font-medium">{result.parsed.original}</p>
-                      <p className="text-muted-foreground">{result.error}</p>
-                    </div>
+              {failed.map((result) => (
+                <div
+                  key={result.parsed.original}
+                  className="flex items-start gap-2 rounded-md bg-destructive/5 p-2 text-sm"
+                >
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                  <div>
+                    <p className="font-medium">{result.parsed.original}</p>
+                    <p className="text-muted-foreground">{result.error}</p>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

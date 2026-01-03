@@ -16,6 +16,9 @@ export default function Header({
   profile,
   onDisconnect,
 }: HeaderProps) {
+  const initial = (profile?.display_name?.trim()?.[0] ?? "U").toUpperCase();
+  const avatarUrl = profile?.images?.[0]?.url;
+
   return (
     <header>
       <div className="container mx-auto flex items-center justify-between p-4">
@@ -30,12 +33,10 @@ export default function Header({
           <div className="flex items-center gap-3">
             <Avatar className="size-8">
               <AvatarImage
-                src={profile.images?.[0]?.url || "/placeholder.svg"}
+                src={avatarUrl ?? "/placeholder.svg"}
                 alt={profile.display_name}
               />
-              <AvatarFallback>
-                {profile.display_name?.[0] || "U"}
-              </AvatarFallback>
+              <AvatarFallback>{initial}</AvatarFallback>
             </Avatar>
 
             <span className="hidden text-sm font-medium sm:inline">

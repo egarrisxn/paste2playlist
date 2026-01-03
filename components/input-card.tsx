@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { ListMusic } from "lucide-react";
 import {
   Card,
@@ -13,46 +14,102 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import type { InputMode } from "@/lib/types";
+
+type Setter<T> = (v: T | ((prev: T) => T)) => void;
 
 interface InputCardProps {
+  mode: InputMode;
+  setMode: Setter<InputMode>;
   albumInput: string;
-  setAlbumInput: (v: string) => void;
+  setAlbumInput: Setter<string>;
   playlistName: string;
-  setPlaylistName: (v: string) => void;
+  setPlaylistName: Setter<string>;
   playlistDescription: string;
-  setPlaylistDescription: (v: string) => void;
+  setPlaylistDescription: Setter<string>;
   isPublic: boolean;
   setIsPublic: (v: boolean) => void;
   onCreate: () => void;
 }
 
-export default function InputCard({
-  albumInput,
-  setAlbumInput,
-  playlistName,
-  setPlaylistName,
-  playlistDescription,
-  setPlaylistDescription,
-  isPublic,
-  setIsPublic,
-  onCreate,
-}: InputCardProps) {
+export default function InputCard(props: InputCardProps) {
+  const {
+    mode,
+    setMode,
+    albumInput,
+    setAlbumInput,
+    playlistName,
+    setPlaylistName,
+    playlistDescription,
+    setPlaylistDescription,
+    isPublic,
+    setIsPublic,
+    onCreate,
+  } = props;
+
+  const { description, placeholder, title } = useMemo(() => {
+    const description =
+      mode === "album"
+        ? "Enter one album per line in the format: Artist - Album"
+        : "Enter one per line in the format: Artist - Year (we will resolve it to Artist - Album)";
+
+    const placeholder =
+      mode === "album"
+        ? `Example:\nRadiohead - OK Computer\nKendrick Lamar – DAMN.\nTaylor Swift — 1989`
+        : `Example:\nTurnstile - 2025\nTyler, The Creator - 2025\nThe Acacia Strain — 2025`;
+
+    const title =
+      mode === "album"
+        ? "Paste Your Album List"
+        : "Paste Your Artist-Year List";
+    return { description, placeholder, title };
+  }, [mode]);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListMusic className="size-5" />
-          Paste Your Album List
+          {title}
         </CardTitle>
-        <CardDescription>
-          Enter one album per line in the format: Artist - Album
-        </CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
+        <div className="flex items-center justify-between rounded-md border border-border p-3">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">Input Mode</p>
+            <p className="text-xs text-muted-foreground">
+              {mode === "album"
+                ? "Artist - Album"
+                : "Artist - Year (auto-resolves to full-length album for that year)"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="mode-toggle"
+              className="text-xs text-muted-foreground"
+            >
+              Album
+            </Label>
+            <Switch
+              id="mode-toggle"
+              checked={mode === "year"}
+              onCheckedChange={(checked) => setMode(checked ? "year" : "album")}
+            />
+            <Label
+              htmlFor="mode-toggle"
+              className="text-xs text-muted-foreground"
+            >
+              Year
+            </Label>
+          </div>
+        </div>
+
         <div>
           <Textarea
-            placeholder={`Example:\nRadiohead - OK Computer\nKendrick Lamar – DAMN.\nTaylor Swift — 1989`}
+            placeholder={placeholder}
             value={albumInput}
             onChange={(e) => setAlbumInput(e.target.value)}
             className="min-h-50 font-mono text-sm"
