@@ -1,3 +1,7 @@
+export type Setter<T> = (v: T | ((prev: T) => T)) => void;
+
+export type Status = "loading" | "error";
+
 export type Step = "connect" | "input" | "processing" | "results";
 
 export type ProcessingPhase =

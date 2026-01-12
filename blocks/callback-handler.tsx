@@ -13,8 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { exchangeCodeForToken, getMe } from "@/lib/spotify";
 import { clientId, redirectUri } from "@/lib/env";
-
-type Status = "loading" | "error";
+import type { Status } from "@/lib/types";
 
 function clearAuthSessionStorage() {
   sessionStorage.removeItem("spotify_code_verifier");

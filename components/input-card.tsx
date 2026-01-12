@@ -14,9 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import type { InputMode } from "@/lib/types";
-
-type Setter<T> = (v: T | ((prev: T) => T)) => void;
+import type { InputMode, Setter } from "@/lib/types";
 
 interface InputCardProps {
   mode: InputMode;
