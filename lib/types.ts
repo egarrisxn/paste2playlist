@@ -5,12 +5,7 @@ export type Status = "loading" | "error";
 export type Step = "connect" | "input" | "processing" | "results";
 
 export type ProcessingPhase =
-  | "parsing"
-  | "matching"
-  | "fetching"
-  | "creating"
-  | "adding"
-  | "done";
+  "parsing" | "matching" | "fetching" | "creating" | "adding" | "done";
 
 export type InputMode = "album" | "year";
 
