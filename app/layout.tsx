@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "@/components/ui/sonner";
@@ -15,18 +15,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const SITE_URL = "https://paste2playlist.vercel.app";
-export const SITE_TITLE = "Paste2Playlist";
-export const SITE_DESC = "The official page for Paste2Playlist!";
-export const SITE_HANDLE = "@ethanxgarrison";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  alternates: {
-    canonical: SITE_URL,
-  },
-  title: SITE_TITLE,
-  description: SITE_DESC,
+  metadataBase: new URL("https://paste2playlist.vercel.app"),
+  title: "Paste2Playlist",
+  description: "Create Spotify playlists from text.",
   referrer: "origin-when-cross-origin",
   keywords: [
     "spotify",
@@ -39,18 +31,27 @@ export const metadata: Metadata = {
   openGraph: {
     locale: "en_US",
     type: "website",
-    title: SITE_TITLE,
-    description: SITE_DESC,
-    url: SITE_URL,
-    siteName: SITE_TITLE,
+    title: "Paste2Playlist",
+    description: "Create Spotify playlists from text.",
+    url: "https://paste2playlist.vercel.app",
+    siteName: "Paste2Playlist",
   },
   twitter: {
     card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESC,
-    creator: SITE_HANDLE,
-    site: SITE_HANDLE,
+    title: "Paste2Playlist",
+    description: "Create Spotify playlists from text.",
+    creator: "@ethanxgarrison",
+    site: "@ethanxgarrison",
   },
+};
+
+export const viewport: Viewport = {
+  initialScale: 1,
+  width: "device-width",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({
@@ -60,6 +61,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="apple-mobile-web-app-title" content="Paste2Playlist" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
